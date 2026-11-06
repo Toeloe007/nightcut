@@ -9,23 +9,26 @@ output_dir: ./output
 # letsplay:   keep everything, cut only dead air, split into episodes.
 mode: highlights
 
+story_mode:
+  enabled: true
+  lookback_s: 600
+
 # Source layout. Regions are fractions of the full recorded frame (0..1),
 # so they work for the original file and for downscaled copies alike.
 # The default matches a 2560x2520 canvas: gameplay 2560x1440 on top,
 # facecam 1920x1080 bottom left.
 layout:
-  gameplay: { x: 0.0, y: 0.0, w: 1.0, h: 0.571429 }
-  facecam:  { x: 0.0, y: 0.571429, w: 0.75, h: 0.428571 }   # set to null if you record without facecam
-  facecam_burned_in: false   # true if the cam is already part of the gameplay picture (see config/examples)
+  gameplay: { x: 0.0, y: 0.0, w: 1.0, h: 1.0 }
+  facecam:  { x: 0.031, y: 0.574, w: 0.855, h: 0.426 }
+  facecam_burned_in: true
 
 # Audio streams, matched by their title (OBS track names). A title also matches the start of
 # a longer name ("MIC" finds "MIC Main Headset"), and several names can be given as a list.
 # Falls back to the given stream position (0-based, audio streams only) if no title matches.
 audio:
-  mic:   { title: MIC,   index: 1 }
-  game:  { title: GAME,  index: 2 }
-  party: { title: [PARTY, DISCORD, TEAMSPEAK], index: 3 }    # voice chat; set to null if unused
-  mix:   null    # full mix, e.g. { title: null, index: 0 }; only needed when a voice is heard nowhere else (AI assistant, TTS)
+  mic:   { title: null, index: 0 }   # the mixed track
+  game:  null
+  party: null
   sample_rate: 16000
 
 # Speech-to-text on the mic track.
@@ -49,13 +52,14 @@ signals:
 
 # Candidate selection before vision/LLM.
 candidates:
-  max_count: 40           # at least this many ...
-  per_hour: 30            # ... or this many per hour of recording, whichever is higher
-  min_gap_s: 25
-  pre_roll_s: 12
-  post_roll_s: 6
-  snap_to_speech_s: 4     # extend a cut so it does not end mid-sentence
-  min_score_percentile: 97
+  max_count: 12
+  per_hour: 8
+  min_gap_s: 60
+  pre_roll_s: 60
+  post_roll_s: 30
+  snap_to_speech_s: 8
+  min_score_percentile: 93
+
 
 # Vision check of candidates (Ollama, multimodal model).
 vision:
@@ -67,7 +71,7 @@ vision:
 # Kill feed scan: finds your kills even without a loud reaction. Needs your in-game
 # name and a killfeed_region in the game profile; otherwise it is skipped.
 killfeed:
-  enabled: true
+  enabled: false
   player_names: []        # e.g. ["Nilson1489"]; several names if you play on different accounts
   every_s: 4              # one look at the feed every few seconds (lines stay visible ~5 s)
   panels_per_call: 6      # feed crops stacked into one image per model call
@@ -78,10 +82,10 @@ killfeed:
 editor:
   enabled: true
   model: qwen3:14b
-  target_minutes: 14
-  max_clip_s: 60
-  max_candidates: 60      # only the best ones go to the LLM, so the prompt fits its context
-  fill: null              # calm session: true = fill up with quiet moments, false = shorter video, null = ask at start
+  target_minutes: 15
+  max_clip_s: 180
+  max_candidates: 30      # only the best ones go to the LLM, so the prompt fits its context
+  fill: false              # calm session: true = fill up with quiet moments, false = shorter video, null = ask at start
 
 # Let's Play mode (--mode letsplay).
 letsplay:
@@ -141,10 +145,10 @@ export:
 
 # Vertical Shorts from the strongest clips.
 shorts:
-  enabled: true
+  enabled: false
   count: 3
-  min_s: 10
-  max_s: 59
+  min_s: 20
+  max_s: 160
   font: Bebas Neue          # must be installed, or put the .ttf into fonts_dir
   fonts_dir: null
   font_size: 120

@@ -1,0 +1,99 @@
+
+name: GTA RP - Narco City Polizei
+
+keywords:
+  3.0:
+    - "oh mein gott"
+    - "was zur hölle"
+    - "ich kann nicht mehr"
+    - "ich lach mich tot"
+    - "das glaubst du nicht"
+    - "waffe runter"
+    - "schüsse gefallen"
+    - "beamter verletzt"
+    - "mann am boden"
+    - "hände hoch"
+    - "bleiben sie stehen"
+    - "verfolgungsjagd"
+    - "geiselnahme"
+    - "überfall"
+    - "explosion"
+    - "10 80"
+    - "shoots fired"
+
+  2.0:
+    - "was ist denn hier los"
+    - "das kann nicht wahr sein"
+    - "was machen sie da"
+    - "sie sind festgenommen"
+    - "sie sind verhaftet"
+    - "verstärkung"
+    - "notruf"
+    - "tatverdächtiger"
+    - "durchsuchung"
+    - "schießerei"
+    - "verfolgung"
+    - "eskaliert"
+    - "ich sterbe"
+    - "unfassbar"
+    - "alter schwede"
+
+  1.0:
+    - "krass"
+    - "alter"
+    - "haha"
+    - "nein"
+    - "warum"
+    - "schnell"
+    - "polizei"
+    - "kontrolle"
+    - "verdächtig"
+    - "stehen bleiben"
+    - "achtung"
+    - "was"
+    - "hilfe"
+
+vision_hints: >-
+  GTA V Roleplay auf dem deutschen Server Narco City.
+  Der Spieler spielt einen Polizisten beim NCPD.
+
+  WICHTIG: Bewerte Szenen nach ihrem Unterhaltungswert,
+  nicht nur nach Action oder Lautstärke.
+
+  Besonders interessante Ereignisse:
+  Lustige und absurde Roleplay-Situationen,
+  unerwartete Wendungen, spannende Polizeikontrollen,
+  eskalierende Streitgespräche, Festnahmen,
+  Verfolgungsjagden, Schießereien, Unfälle,
+  überraschende Begegnungen und dramatische Momente.
+
+  FACE CAM:
+  Falls eine Facecam sichtbar ist, beachte auffällige
+  Reaktionen wie starkes Lachen, sichtbare Überraschung,
+  Schock, Frustration oder ungläubiges Kopfschütteln.
+  Solche Reaktionen können auf besonders interessante
+  Situationen hinweisen.
+
+  DIALOGE:
+  Auch ruhige Gespräche können hervorragende Highlights
+  sein. Besonders wichtig sind ungewöhnliche Aussagen,
+  absurde Ausreden, Konflikte und überraschende Antworten.
+
+  WENIG INTERESSANT:
+  Gewöhnliche Streifenfahrten ohne Ereignisse,
+  längere Menüs, Ladebildschirme, AFK-Phasen,
+  wiederholte Routineaufgaben und ereignislose Fahrten.
+
+  Eine spannende Szene sollte möglichst mit ihrem
+  Kontext erhalten bleiben und nicht mitten im
+  entscheidenden Gespräch enden.
+
+vision_events:
+  funny: 1.0
+  reaction: 0.95
+  chase: 0.95
+  shootout: 0.95
+  arrest: 0.9
+  escalation: 0.9
+  dramatic_dialogue: 0.85
+  surprise: 0.9

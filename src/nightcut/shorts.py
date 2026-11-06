@@ -87,7 +87,12 @@ def render(info: MediaInfo, clip: dict, n: int, streams: dict[str, AudioStream],
     dur = min(clip["end"] - clip["start"], scfg["max_s"])
     lay = cfg["layout"]
 
-    if lay.get("facecam"):
+    # A portrait VOD with a burned-in facecam already has its final layout.
+    # Preserve the full image instead of cropping and stacking it again.
+    if info.width * 16 == info.height * 9 and lay.get("facecam_burned_in", False):
+        graph = f"[0:v]scale={W}:{H},setsar=1[stack];"
+        src = "[stack]"
+    elif lay.get("facecam"):
         cam_h = round(W * 9 / 16 / 2) * 2                      # 16:9 camera across the full width
         game_h = H - cam_h
         graph = (f"[0:v]{crop_filter(lay['facecam'], info.width, info.height)},scale={W}:{cam_h}:force_original_aspect_ratio=increase,crop={W}:{cam_h}[cam];"
@@ -97,10 +102,7 @@ def render(info: MediaInfo, clip: dict, n: int, streams: dict[str, AudioStream],
     else:
         graph = f"[0:v]{crop_filter(lay['gameplay'], info.width, info.height)},crop=ih*9/16:ih,scale={W}:{H}[stack];"
         src = "[stack]"
-    sub = f"subtitles=filename='{_filter_path(ass)}'"
-    if scfg.get("fonts_dir"):
-        sub += f":fontsdir='{_filter_path(Path(scfg['fonts_dir']))}'"
-    graph += f"{src}{sub}[v];"
+    graph += f"{src}null[v];"
     audio_in = "".join(f"[0:{s.index}]" for s in streams.values())
     graph += f"{audio_in}amix=inputs={len(streams)}:normalize=0:dropout_transition=0[a]"
 

@@ -6,19 +6,43 @@ import json
 
 from . import llm
 
-SYSTEM = """You are the editor of a German gaming YouTube channel.
-From a list of candidate moments of one recording session you build the video:
-- keep the strongest moments: kills, multikills, clutch plays, successes, fails, chaos, funny moments and big reactions
-- in calm games (simulators, story games) the player's talk and reactions are the content: pick what is entertaining to hear
-- a death is only worth it when it is funny or the reaction is great; never several plain deaths
-- drop boring or repetitive moments
-- the sum of the chosen clip lengths must be close to the target length; pick enough clips
-- the first clip must be a strong hook; after that keep chronological order unless reordering clearly helps
-- give every chosen clip a short German title (max 5 words) and a one-sentence reason
-- titles and reasons only state what really happens; a wish, plan or guess of the player ("hopefully a shiny") is not an event
-Answer only with JSON:
-{"clips": [{"id": int, "title": str, "reason": str}], "video_title_ideas": [str, str, str]}"""
 
+SYSTEM = """Du bist ein professioneller Editor für deutsche
+GTA-Roleplay-TikToks und YouTube Shorts.
+
+Deine Aufgabe ist es, aus den Kandidaten die besten
+eigenständig verständlichen GTA-RP-Szenen auszuwählen.
+
+BEWERTUNG:
+1. Eine Szene braucht einen verständlichen Kontext.
+2. Sie braucht einen interessanten Verlauf oder Konflikt.
+3. Sie sollte einen Höhepunkt oder eine Pointe besitzen.
+4. Sie sollte möglichst eine sinnvolle Auflösung haben.
+
+WICHTIGE REGELN:
+- Ein Tod allein ist kein Highlight. Entscheidend ist,
+  was dazu geführt hat.
+- Lachen allein ist kein Highlight. Der Zuschauer muss
+  verstehen können, warum gelacht wird.
+- Polizeikontrollen sind nur interessant, wenn etwas
+  Ungewöhnliches, Spannendes oder Lustiges passiert.
+- Bevorzuge unerwartete Wendungen, absurde Gespräche,
+  Verfolgungsjagden und eskalierende Situationen.
+- Vermeide Routinefahrten, Leerlauf und langweilige Dialoge.
+- Erfinde keine Ereignisse.
+- Wähle lieber wenige gute als viele mittelmäßige Szenen.
+- Fülle keine künstliche Zielvideolänge auf.
+- Jeder ausgewählte Clip muss möglichst allein funktionieren.
+- Wähle keine Szene nur aufgrund ihrer Lautstärke.
+- Bevorzuge Kandidaten mit erkennbarem Anfang und Ende.
+
+Gib jedem Clip einen kurzen deutschen Titel
+und eine Begründung für seine Auswahl.
+
+Antworte ausschließlich mit JSON:
+{"clips": [{"id": int, "title": str, "reason": str}],
+"video_title_ideas": [str, str, str]}
+"""
 
 def _clamp(c: dict, max_len: float) -> tuple[float, float]:
     """Shorten long clips around their peak."""
@@ -43,8 +67,8 @@ def _title_top_ups(chosen: list[dict], cfg: dict) -> None:
     missing = [c for c in chosen if not c.get("title")]
     if not missing:
         return
-    listing = [{"id": c["id"], "what_happens": c.get("vision", {}).get("summary", "")[:120],
-                "player_said": c["transcript"][:150]} for c in missing]
+    listing = [{"id": c["id"], "what_happens": c.get("vision", {}).get("summary", "")[:350],
+                "player_said": c["transcript"][:800]} for c in missing]
     try:
         answer = llm.chat_json(cfg["ollama"], ecfg["model"], TITLE_SYSTEM,
                                f"Game: {cfg['profile'].get('name', 'unknown')}. Clips:\n{json.dumps(listing, ensure_ascii=False)}",
@@ -135,7 +159,11 @@ def choose(candidates: list[dict], cfg: dict) -> tuple[list[dict], dict]:
     # Moments the vision model saw "nothing" in come last, ranked by audio/transcript only: in calm games
     # the picture rarely changes and the reaction is what matters.
     total = sum(c["end"] - c["start"] for c in chosen)
-    for c in _top_up_order(candidates, ecfg.get("fill") is not False):
+    for c in (
+        _top_up_order(candidates, True)
+        if ecfg.get("fill", True)
+        else []
+    ):
         if total >= target_s * 0.9:
             break
         if c["id"] in seen:

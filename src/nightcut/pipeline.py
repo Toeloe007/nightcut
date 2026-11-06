@@ -18,7 +18,7 @@ import numpy as np
 from rich.console import Console
 
 from . import gpus  # first: sets CUDA_DEVICE_ORDER before PyTorch is loaded
-from . import costs, editor, export_xmeml, killfeed, metadata, shorts, signals, summary, thumbnails, vision
+from . import context_shorts, story_editor, costs, editor, export_xmeml, killfeed, metadata, shorts, signals, summary, thumbnails, vision
 from .media import extract_audio_tracks, load_pcm, probe
 from .render import render_clip
 from .transcribe import free_vram, load_asr, transcribe_regions
@@ -336,7 +336,9 @@ class Run:
             score = signals.combine(sig, cfg["signals"], cfg["signals"]["smooth_s"])
             np.save(self.work / "cache" / "score.npy", score)
             # the editor should be able to choose: about twice as many ~20 s moments as the target needs
-            need = min(int(2 * cfg["editor"]["target_minutes"] * 60 / 20), cfg["editor"].get("max_candidates", 60))
+            need = (0 if cfg.get("story_mode", {}).get("enabled", True) else
+                    min(int(2 * cfg["editor"]["target_minutes"] * 60 / 20),
+                        cfg["editor"].get("max_candidates", 60)))
             cands = signals.pick_candidates(score, segments, {"min_count": need, **cfg["candidates"]}, info.duration)
             if readings:
                 kills = killfeed.player_kills(readings, kcfg["player_names"])
@@ -356,6 +358,10 @@ class Run:
                 vision.rescore(result, cfg)
                 return result
             candidates = self._stage("vision", do_vision)
+
+        # Story-first workflow: render only selected narrative parts, no Shorts/captions.
+        if cfg.get("story_mode", {}).get("enabled", True):
+            return self._run_stories(info, streams, candidates, segments)
 
         fill = cfg["editor"].get("fill") is not False
         if self._json("edit").exists() and self._load("edit").get("fill", True) != fill:
@@ -381,7 +387,19 @@ class Run:
             out = self.work / "shorts"
             out.mkdir(exist_ok=True)
             gpu = self._gpu(1)  # 2 GPUs: Whisper and encoder on the second card
-            picked = shorts.pick(edit["clips"], cfg["shorts"]["count"], cfg["shorts"]["min_s"])
+            # Select shorts from detected events, using the full timestamped transcript.
+            try:
+                picked = context_shorts.choose(candidates, segments, cfg, info.duration)
+            except Exception as exc:
+                console.print(f"[yellow]Context shorts failed ({exc}); using original selection[/yellow]")
+                picked = shorts.pick(edit["clips"], cfg["shorts"]["count"], cfg["shorts"]["min_s"])
+            if not picked:
+                console.print("[yellow]Context AI selected 0 valid shorts; falling back to original clips.[/yellow]")
+                picked = shorts.pick(edit["clips"], cfg["shorts"]["count"], cfg["shorts"]["min_s"])
+            if not picked:
+                console.print("[yellow]No clips meet shorts.min_s; no Shorts will be rendered.[/yellow]")
+                return []
+            console.print(f"  {len(picked)} shorts selected")
             pcm = load_pcm(Path(pcm_paths["mic"]))
             asr = load_asr({**cfg["transcribe"], **({"device": gpu} if gpu is not None else {})})
             words = [shorts.word_timestamps(pcm, sr, c["start"], c["start"] + min(c["end"] - c["start"],
@@ -424,6 +442,45 @@ class Run:
                 info, edit["clips"], [s["file"] for s in made_shorts], cfg, self.work / "thumbnails"))
 
         self._write_report(info, candidates, edit)
+        return xml_path
+
+    def _run_stories(self, info, streams, candidates, segments) -> Path:
+        cfg = self.cfg
+        def plan():
+            return story_editor.choose(candidates, segments, cfg, info.duration,
+                                       debug_output=str(self.work / "story_debug.json"), info=info)
+        # Re-plan when upgrading the story algorithm, while keeping expensive
+        # audio/transcript/candidate/vision caches intact.
+        debug_path = self.work / "story_debug.json"
+        if self._json("stories").exists():
+            try:
+                previous = json.loads(debug_path.read_text(encoding="utf-8"))
+                if previous.get("version", 0) < 6:
+                    self.force.add("stories")
+            except (OSError, ValueError):
+                self.force.add("stories")
+        parts = self._stage("stories", plan)
+        console.print(f"  {len(parts)} story parts selected")
+        # Do not invent filler material if the model found no coherent story.
+        if not parts:
+            console.print("[yellow]No coherent stories found; no clips rendered.[/yellow]")
+            self._write_report(info, candidates, {"clips": [], "video_title_ideas": []})
+            return self.work
+
+        def do_render():
+            out = self.work / "media"
+            out.mkdir(exist_ok=True)
+            jobs = list(enumerate(parts, 1))
+            encoders = [self._gpu(i) for i in range(max(1, len(self.gpu_list)))]
+            return gpus.parallel_map(jobs, encoders,
+                lambda job, gpu: render_clip(info, job[1], job[0], streams, cfg, out, gpu=gpu))
+
+        rendered = self._stage("story_render", do_render)
+        xml_path = self.work / f"{self.source.stem}_stories.xml"
+        self._stage("story_export", lambda: str(export_xmeml.write(
+            rendered, list(streams), cfg, xml_path, f"{self.source.stem} stories")))
+        # A machine-readable edit decision is useful for reviewing story parts.
+        self._write_report(info, candidates, {"clips": parts, "video_title_ideas": []})
         return xml_path
 
     def _write_report(self, info, candidates, edit) -> None:
